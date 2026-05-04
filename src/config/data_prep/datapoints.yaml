@@ -1,0 +1,69 @@
+# Datapoints to combine into training data. Each entry is loaded once; order preserved.
+# path: relative to project root. loader: json (uses json_source_loader).
+# scenario_type: security | qa | payload | tool (default: security).
+
+datapoints:
+  - id: exploit_portswigger
+    path: data_points/exploit/portswigger_dataset.json
+    loader: json
+    scenario_type: security
+
+  - id: exploit_invicti
+    path: data_points/exploit/invicti_dataset.json
+    loader: json
+    scenario_type: security
+
+  - id: exploit_juice_shop
+    path: data_points/exploit/juiceshop_dataset.json
+    loader: json
+    scenario_type: security
+
+  - id: exploit_n8n
+    path: data_points/exploit/n8n_dataset.json
+    loader: json
+    scenario_type: security
+
+  - id: reasoning_primus
+    path: data_points/reasoning/primus_reasoning_dataset.yaml
+    loader: json
+    scenario_type: qa
+
+  # - id: exploit_web_app
+  #   path: data_points/exploit/web_app_dataset.json
+  #   loader: json
+  #   scenario_type: security
+
+  # - id: exploit_org
+  #   path: data_points/exploit/org_dataset.json
+  #   loader: json
+  #   scenario_type: security
+
+  # - id: qa
+  #   path: data_points/QA/cybersec_QA_dataset-1.yaml
+  #   loader: json
+  #   scenario_type: qa
+
+  # - id: qa_cybersecurity
+  #   path: data_points/QA/cybersec_QA_dataset-2.yaml
+  #   loader: json
+  #   scenario_type: qa
+
+  # - id: payload
+  #   path: data_points/payload/payload_dataset.json
+  #   loader: json
+  #   scenario_type: payload
+
+  # - id: tool
+  #   path: data_points/tool
+  #   loader: json
+  #   scenario_type: tool
+
+  - id: exploit_hf_exploitdb
+    path: data_points/exploit/hf_exploitdb_dataset.json
+    loader: json
+    scenario_type: security
+
+  - id: shell_commands
+    path: data_points/tool/shell_commands_dataset.json
+    loader: json
+    scenario_type: tool

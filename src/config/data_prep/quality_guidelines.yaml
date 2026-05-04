@@ -1,0 +1,39 @@
+# Training data quality guidelines (single multi-line string)
+content: |
+  Training Data Quality Guidelines:
+
+  1. ACCURACY
+     - All commands must be accurate and tested
+     - Use real CVE numbers where applicable
+     - Reference actual tools and their correct syntax
+     - Provide working exploits and POCs
+
+  2. COMPLETENESS
+     - Cover all steps from start to finish
+     - Include error handling and troubleshooting
+     - Provide context and prerequisites
+     - Explain the "why" not just the "how"
+
+  3. SECURITY AWARENESS
+     - Always discuss detection risks
+     - Include evasion techniques
+     - Mention defensive countermeasures
+     - Reference MITRE ATT&CK framework
+
+  4. DIVERSITY
+     - Cover different platforms (Linux, Windows, macOS, Cloud)
+     - Include various difficulty levels
+     - Mix tool-based and manual techniques
+     - Show multiple approaches to same goal
+
+  5. REALISM
+     - Use realistic scenarios
+     - Include common obstacles and solutions
+     - Discuss operational security
+     - Reference real-world attack patterns
+
+  6. ETHICAL FRAMING
+     - Assume authorized testing
+     - Mention importance of scope
+     - Discuss responsible disclosure
+     - Include remediation guidance

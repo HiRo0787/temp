@@ -1,0 +1,241 @@
+# OWASP Top 10 2021 Mapping for Rabit0 Training Data
+# Maps vulnerability types to OWASP categories
+
+owasp_top_10_2021:
+  A01:
+    name: "Broken Access Control"
+    description: "Failures related to access control, authorization, and privilege escalation"
+    vulnerabilities:
+      - "access_control"
+      - "idor"
+      - "path_traversal"
+      - "privilege_escalation"
+      - "forced_browsing"
+      - "horizontal_privilege_escalation"
+      - "vertical_privilege_escalation"
+    scenario_patterns:
+      - "ACCESS"
+      - "IDOR"
+      - "PRIV"
+      - "AUTHZ"
+
+  A02:
+    name: "Cryptographic Failures"
+    description: "Failures related to cryptography leading to exposure of sensitive data"
+    vulnerabilities:
+      - "weak_crypto"
+      - "insecure_random"
+      - "password_storage"
+      - "sensitive_data_exposure"
+      - "weak_hashing"
+    scenario_patterns:
+      - "CRYPTO"
+      - "HASH"
+      - "ENCRYPTION"
+
+  A03:
+    name: "Injection"
+    description: "Injection flaws such as SQL, NoSQL, OS command, and LDAP injection"
+    vulnerabilities:
+      - "sql_injection"
+      - "nosql_injection"
+      - "command_injection"
+      - "ldap_injection"
+      - "xml_injection"
+      - "ssti"
+      - "template_injection"
+    scenario_patterns:
+      - "SQLI"
+      - "NOSQL"
+      - "CMDI"
+      - "COMMAND"
+      - "INJECTION"
+      - "SSTI"
+
+  A04:
+    name: "Insecure Design"
+    description: "Risks related to design and architectural flaws"
+    vulnerabilities:
+      - "business_logic"
+      - "race_condition"
+      - "design_flaw"
+      - "workflow_bypass"
+    scenario_patterns:
+      - "LOGIC"
+      - "RACE"
+      - "DESIGN"
+      - "WORKFLOW"
+
+  A05:
+    name: "Security Misconfiguration"
+    description: "Security misconfiguration at any level of the application stack"
+    vulnerabilities:
+      - "misconfiguration"
+      - "default_credentials"
+      - "verbose_errors"
+      - "cors_misconfiguration"
+      - "cache_misconfiguration"
+    scenario_patterns:
+      - "CONFIG"
+      - "CORS"
+      - "CACHE"
+      - "DEFAULT"
+
+  A06:
+    name: "Vulnerable and Outdated Components"
+    description: "Using components with known vulnerabilities"
+    vulnerabilities:
+      - "outdated_component"
+      - "known_cve"
+      - "vulnerable_library"
+    scenario_patterns:
+      - "CVE"
+      - "VULN"
+      - "COMPONENT"
+
+  A07:
+    name: "Identification and Authentication Failures"
+    description: "Failures related to user authentication and session management"
+    vulnerabilities:
+      - "auth_bypass"
+      - "weak_password"
+      - "session_fixation"
+      - "credential_stuffing"
+      - "brute_force"
+      - "2fa_bypass"
+      - "jwt_vulnerabilities"
+      - "oauth_vulnerabilities"
+      - "password_reset"
+    scenario_patterns:
+      - "AUTH"
+      - "SESSION"
+      - "JWT"
+      - "OAUTH"
+      - "2FA"
+      - "LOGIN"
+      - "PASSWORD"
+
+  A08:
+    name: "Software and Data Integrity Failures"
+    description: "Code and infrastructure that does not protect against integrity violations"
+    vulnerabilities:
+      - "deserialization"
+      - "insecure_deserialization"
+      - "prototype_pollution"
+      - "code_injection"
+      - "file_upload"
+      - "dom_xss"
+    scenario_patterns:
+      - "DESER"
+      - "UPLOAD"
+      - "POLLUTION"
+      - "INTEGRITY"
+
+  A09:
+    name: "Security Logging and Monitoring Failures"
+    description: "Insufficient logging and monitoring"
+    vulnerabilities:
+      - "insufficient_logging"
+      - "missing_monitoring"
+    scenario_patterns:
+      - "LOG"
+      - "MONITOR"
+
+  A10:
+    name: "Server-Side Request Forgery"
+    description: "SSRF flaws occur when web app fetches remote resource without validating URL"
+    vulnerabilities:
+      - "ssrf"
+      - "blind_ssrf"
+    scenario_patterns:
+      - "SSRF"
+
+# Additional mappings for common vulnerability types
+vulnerability_to_owasp:
+  # Cross-Site Scripting (commonly falls under Injection in modern context, but often discussed separately)
+  xss: "A03"  # Injection
+  dom_xss: "A08"  # Software and Data Integrity
+  stored_xss: "A03"  # Injection
+  reflected_xss: "A03"  # Injection
+
+  # CSRF (often related to authentication/session management)
+  csrf: "A07"  # Identification and Authentication Failures
+
+  # XXE (XML External Entity)
+  xxe: "A05"  # Security Misconfiguration (or A03 Injection)
+
+  # Clickjacking (UI redress)
+  clickjacking: "A04"  # Insecure Design
+
+  # HTTP Request Smuggling
+  request_smuggling: "A05"  # Security Misconfiguration
+  http_smuggling: "A05"  # Security Misconfiguration
+
+  # WebSocket vulnerabilities
+  websocket: "A01"  # Often relates to access control
+
+  # GraphQL
+  graphql: "A01"  # Often access control or A03 injection
+
+  # Information Disclosure
+  info_disclosure: "A05"  # Security Misconfiguration
+
+  # Open Redirect
+  open_redirect: "A01"  # Broken Access Control
+
+# Scenario ID prefix to OWASP mapping
+# This helps automatically tag scenarios based on their IDs
+scenario_prefix_mapping:
+  # Access Control
+  AC: "A01"
+  ACCESS: "A01"
+  IDOR: "A01"
+  TRAVERSAL: "A01"
+  REDIRECT: "A01"
+
+  # Injection
+  SQLI: "A03"
+  NOSQL: "A03"
+  XSS: "A03"
+  CMDI: "A03"
+  COMMAND: "A03"
+  SSTI: "A03"
+  TEMPLATE: "A03"
+  XXE: "A05"  # Can be A03 or A05, using A05 per mapping
+
+  # Insecure Design
+  LOGIC: "A04"
+  BL: "A04"  # Business Logic
+  RACE: "A04"
+  CLICKJACKING: "A04"
+  CLICK: "A04"
+
+  # Security Misconfiguration
+  CORS: "A05"
+  INFO: "A05"
+  CACHE: "A05"
+  HOST: "A05"  # Host header attacks
+  SMUGGLE: "A05"
+
+  # Authentication
+  AUTH: "A07"
+  JWT: "A07"
+  OAUTH: "A07"
+  CSRF: "A07"
+  SAML: "A07"
+
+  # Data Integrity
+  DESER: "A08"
+  UPLOAD: "A08"
+  PROTOTYPE: "A08"
+  PROTO: "A08"  # Prototype pollution
+  POLLUTION: "A08"
+
+  # SSRF
+  SSRF: "A10"
+
+  # API and Web-specific
+  API: "A01"  # Often access control, can vary
+  GRAPHQL: "A01"
+  WEBSOCKET: "A01"
+  WS: "A01"

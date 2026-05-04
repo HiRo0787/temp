@@ -1,0 +1,176 @@
+reconnaissance:
+  description: Information gathering and enumeration
+  topics:
+    - OSINT techniques
+    - Subdomain enumeration
+    - Port scanning
+    - Service detection
+    - DNS enumeration
+    - Technology fingerprinting
+    - Network mapping
+    - Employee enumeration
+    - Email harvesting
+
+vulnerability_assessment:
+  description: Identifying security weaknesses
+  topics:
+    - CVE analysis
+    - Configuration auditing
+    - Patch gap analysis
+    - Weak credential identification
+    - SSL/TLS analysis
+    - API security testing
+    - Authentication bypass
+    - Authorization flaws
+
+web_exploitation:
+  description: Web application security
+  topics:
+    - SQL injection
+    - XSS (reflected, stored, DOM)
+    - CSRF
+    - XXE
+    - SSRF
+    - Deserialization attacks
+    - Path traversal
+    - Command injection
+    - OAuth vulnerabilities
+    - JWT attacks
+    - GraphQL exploitation
+    - API abuse
+
+network_exploitation:
+  description: Network-level attacks
+  topics:
+    - SMB exploitation
+    - RDP attacks
+    - SSH brute force and tunneling
+    - VPN vulnerabilities
+    - MITM attacks
+    - ARP poisoning
+    - DNS spoofing
+    - Network pivoting
+
+system_exploitation:
+  description: Operating system exploitation
+  topics:
+    - Buffer overflows
+    - Kernel exploits
+    - Service exploitation
+    - Memory corruption
+    - Race conditions
+    - DLL hijacking
+    - Shared library injection
+
+privilege_escalation:
+  description: Elevating access rights
+  topics:
+    - Linux privilege escalation
+    - Windows privilege escalation
+    - SUID/SGID abuse
+    - Kernel exploits
+    - Sudo misconfigurations
+    - Windows token manipulation
+    - UAC bypass
+    - Service misconfigurations
+    - Scheduled task abuse
+    - Registry manipulation
+
+lateral_movement:
+  description: Moving within compromised networks
+  topics:
+    - Pass-the-hash
+    - Pass-the-ticket
+    - Kerberos attacks
+    - RDP session hijacking
+    - PSExec and alternatives
+    - WMI execution
+    - DCOM exploitation
+    - Remote service creation
+    - SSH tunneling
+
+persistence:
+  description: Maintaining access
+  topics:
+    - Backdoor creation
+    - Cron job abuse
+    - Windows service installation
+    - Registry run keys
+    - Scheduled tasks
+    - Web shells
+    - SSH key injection
+    - Bootkit installation
+    - DLL persistence
+
+credential_access:
+  description: Credential harvesting
+  topics:
+    - Mimikatz usage
+    - LSASS dumping
+    - SAM database extraction
+    - Kerberoasting
+    - AS-REP roasting
+    - DCSync attacks
+    - Browser credential extraction
+    - Password spraying
+    - Credential stuffing
+    - Token theft
+
+defense_evasion:
+  description: Avoiding detection
+  topics:
+    - AV/EDR bypass
+    - Process injection
+    - Code obfuscation
+    - Fileless malware
+    - Living off the land
+    - Log tampering
+    - Timestomping
+    - DLL sideloading
+    - Rootkit techniques
+    - Sandbox evasion
+
+exfiltration:
+  description: Data extraction
+  topics:
+    - Covert channels
+    - DNS exfiltration
+    - HTTPS tunneling
+    - Steganography
+    - Cloud storage abuse
+    - Email exfiltration
+    - Protocol encapsulation
+
+social_engineering:
+  description: Human-focused attacks
+  topics:
+    - Phishing campaigns
+    - Spear phishing
+    - Pretexting
+    - Vishing
+    - Physical security bypass
+    - Tailgating
+    - Badge cloning
+
+cloud_security:
+  description: Cloud infrastructure attacks
+  topics:
+    - AWS exploitation
+    - Azure exploitation
+    - GCP exploitation
+    - S3 bucket enumeration
+    - IAM privilege escalation
+    - Serverless attacks
+    - Container escape
+    - Kubernetes exploitation
+
+mobile_security:
+  description: Mobile application attacks
+  topics:
+    - Android exploitation
+    - iOS exploitation
+    - Mobile API abuse
+    - Certificate pinning bypass
+    - Root/jailbreak detection bypass
+    - Inter-process communication
+    - Deep link exploitation

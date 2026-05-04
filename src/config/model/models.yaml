@@ -1,0 +1,287 @@
+# Model Configuration for Rabit0 Fine-tuning
+# This file defines all available models and their configurations
+# Adding new models only requires updating this file - no code changes needed
+
+version: "1.2"
+last_updated: "2026-04-08"
+
+# Model Registry
+# Each model entry defines:
+#   - name: HuggingFace model identifier
+#   - version: Model version (qwen2.5, qwen3, gemma4 etc.)
+#   - size: Model size identifier (7b, 14b, 30b, 31b etc.)
+#   - architecture: Description of model architecture
+#   - expected_vram: Expected VRAM usage
+#   - fallbacks: Ordered list of fallback models if primary fails
+#   - lora_target_modules: Modules to target for LoRA adapters
+#   - supported: Whether this model is currently supported
+
+models:
+  # Qwen2.5 Models
+  qwen2.5-7b:
+    name: "Qwen/Qwen2.5-Coder-7B-Instruct"
+    version: "qwen2.5"
+    size: "7b"
+    architecture: "Dense (7B parameters, Qwen2.5-Coder)"
+    expected_vram: "~14GB (fits in 20GB with vLLM)"
+    fallbacks: []
+    lora_target_modules:
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
+      - "o_proj"
+      - "gate_proj"
+      - "up_proj"
+      - "down_proj"
+    supported: true
+    trust_remote_code: true
+
+  qwen2.5-14b:
+    name: "Qwen/Qwen2.5-Coder-14B-Instruct"
+    version: "qwen2.5"
+    size: "14b"
+    architecture: "Dense (14B parameters, Qwen2.5-Coder)"
+    expected_vram: "~28GB (requires 40GB+ GPU for vLLM)"
+    fallbacks: ["qwen2.5-7b"]
+    lora_target_modules:
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
+      - "o_proj"
+      - "gate_proj"
+      - "up_proj"
+      - "down_proj"
+    supported: true
+    trust_remote_code: true
+
+  # Qwen3 Models
+  qwen3-4b:
+    name: "Qwen/Qwen3-4B-Instruct-2507"
+    version: "qwen3"
+    size: "4b"
+    architecture: "Dense (4B parameters, Qwen3-Instruct)"
+    expected_vram: "~8GB (fits in 20GB with vLLM)"
+    fallbacks: ["qwen3-8b", "qwen2.5-7b"]
+    lora_target_modules:
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
+      - "o_proj"
+      - "gate_proj"
+      - "up_proj"
+      - "down_proj"
+    supported: true
+    trust_remote_code: true
+
+  qwen3guard-4b:
+    name: "Qwen/Qwen3Guard-Gen-4B"
+    version: "qwen3"
+    size: "4b"
+    architecture: "Dense (4B parameters, Qwen3Guard - Safety-aligned)"
+    expected_vram: "~8GB (fits in 20GB with vLLM)"
+    fallbacks: ["qwen3-4b", "qwen3-8b", "qwen2.5-7b"]
+    lora_target_modules:
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
+      - "o_proj"
+      - "gate_proj"
+      - "up_proj"
+      - "down_proj"
+    supported: true
+    trust_remote_code: true
+
+  qwen3-8b:
+    name: "Qwen/Qwen3-8B"
+    version: "qwen3"
+    size: "8b"
+    architecture: "Dense (8B parameters, Qwen3)"
+    expected_vram: "~16GB (fits in 20GB with vLLM)"
+    fallbacks: ["qwen2.5-7b"]
+    lora_target_modules:
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
+      - "o_proj"
+      - "gate_proj"
+      - "up_proj"
+      - "down_proj"
+    supported: true
+    trust_remote_code: true
+
+  # Qwen3-8B-Base: pretraining-stage causal LM (36 layers, 32k context, GQA 32/8)
+  qwen3-8b-base:
+    name: "Qwen/Qwen3-8B"
+    version: "qwen3"
+    size: "8b"
+    architecture: "Dense (8.2B params, 6.95B non-embedding, Qwen3-Base pretraining, 36 layers, 32k context, GQA 32/8)"
+    expected_vram: "~16GB (fits in 20GB with vLLM)"
+    fallbacks: ["qwen3-8b", "qwen2.5-7b"]
+    lora_target_modules:
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
+      - "o_proj"
+      - "gate_proj"
+      - "up_proj"
+      - "down_proj"
+    supported: true
+    trust_remote_code: true
+
+  qwen3.5-9b:
+    name: "Qwen/Qwen3.5-9B"
+    version: "qwen3.5"
+    size: "9b"
+    architecture: "Causal LM with vision encoder (9B parameters, 32 layers, 262k native context)"
+    expected_vram: "~18GB+ (4-bit recommended for 19GB GPUs)"
+    fallbacks: ["qwen3-8b", "qwen2.5-7b"]
+    lora_target_modules:
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
+      - "o_proj"
+      - "gate_proj"
+      - "up_proj"
+      - "down_proj"
+    supported: true
+    trust_remote_code: true
+
+  qwen3-14b:
+    name: "Qwen/Qwen3-14B"
+    version: "qwen3"
+    size: "14b"
+    architecture: "Dense (14B parameters, Qwen3, will fallback to 8B if insufficient memory)"
+    expected_vram: "~28GB (requires 40GB+ GPU for vLLM, will fallback to 8B ~16GB)"
+    fallbacks: ["qwen3-8b", "qwen2.5-7b"]
+    lora_target_modules:
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
+      - "o_proj"
+      - "gate_proj"
+      - "up_proj"
+      - "down_proj"
+    supported: true
+    trust_remote_code: true
+
+  # Qwen3-32B (Dense Model)
+  qwen3-32b:
+    name: "Qwen/Qwen3-32B"
+    version: "qwen3"
+    size: "32b"
+    architecture: "Dense (32.8B parameters, Qwen3)"
+    expected_vram: "~65GB (Requires 80GB GPU for BF16, or 48GB for Int4/FP8)"
+    fallbacks: ["qwen3-30b", "qwen3-14b"]
+    lora_target_modules:
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
+      - "o_proj"
+      - "gate_proj"
+      - "up_proj"
+      - "down_proj"
+    supported: true
+    trust_remote_code: true
+
+  # Qwen3-30B (MoE Model)
+  qwen3-30b:
+    name: "Qwen/Qwen3-Coder-30B-A3B-Instruct"
+    version: "qwen3"
+    size: "30b"
+    architecture: "Dense (30B parameters, Qwen3-Coder)"
+    expected_vram: "~60GB (requires 80GB+ GPU for vLLM, will fallback to 14B if insufficient)"
+    fallbacks: ["qwen3-14b", "qwen3-8b"]
+    lora_target_modules:
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
+      - "o_proj"
+      - "gate_proj"
+      - "up_proj"
+      - "down_proj"
+    supported: true
+    trust_remote_code: true
+
+  # OpenPipe Qwen3 Model
+  openpipe-14b:
+    name: "OpenPipe/Qwen3-14B-Instruct"
+    version: "qwen3"
+    size: "14b"
+    architecture: "Dense (14B parameters, OpenPipe Qwen3)"
+    expected_vram: "~28GB (requires 40GB+ GPU for vLLM)"
+    fallbacks: ["qwen2.5-14b"]
+    lora_target_modules:
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
+      - "o_proj"
+      - "gate_proj"
+      - "up_proj"
+      - "down_proj"
+    supported: true
+    trust_remote_code: true
+
+# Default configurations
+  gemma4-31b:
+    name: "google/gemma-4-31B-it"
+    version: "gemma4"
+    size: "31b"
+    architecture: "Dense (30.7B parameters, Gemma 4 Hybrid Attention)"
+    expected_vram: "~61GB (Fits H100 80GB perfectly)"
+    lora_target_modules:
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
+      - "o_proj"
+      - "gate_proj"
+      - "up_proj"
+      - "down_proj"
+    supported: true
+    trust_remote_code: true
+
+  # Gemma 4 Edge Model
+  gemma4-e4b:
+    name: "google/gemma-4-E4B-it"
+    version: "gemma4"
+    size: "e4b"
+    architecture: "Dense + PLE (4.5B Effective / 8B Total parameters, Gemma 4 Hybrid Attention)"
+    expected_vram: "~16GB (Fits in 20GB RTX 4000/A5000 in BF16)"
+    fallbacks: ["qwen3-4b"]
+    lora_target_modules:
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
+      - "o_proj"
+      - "gate_proj"
+      - "up_proj"
+      - "down_proj"
+    supported: true
+    trust_remote_code: true
+
+defaults:
+  dtype: "bfloat16"
+  use_unsloth: true
+  gpu_memory: 80 
+  lora_config:
+    r: 16 
+    lora_alpha: 128
+    lora_dropout: 0.05  
+    bias: "none"
+    task_type: "CAUSAL_LM"
+
+# Model selection aliases (for backward compatibility)
+aliases:
+  "7b": "qwen2.5-7b"
+  "8b": "qwen3-8b"
+  "9b": "qwen3.5-9b"
+  "14b": "qwen2.5-14b"
+  "30b": "qwen3-30b"
+  "31b": "gemma4-31b"
+  "32b": "qwen3-32b"
+  "e4b": "gemma4-e4b"
+  "qwen2.5": "qwen2.5-7b"
+  "qwen3": "qwen3-32b"
+  "gemma4": "gemma4-31b"
+  "qwen3": "qwen3-8b"
+  "qwen3.5": "qwen3.5-9b"
+

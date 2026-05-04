@@ -1,0 +1,554 @@
+# Rabit0 Training Data Configuration
+# Version: 1.0
+# Dataset: 240-scenario Rabit0 Web Security Training Data
+# Purpose: Configuration and standards for CLI-based security tool training
+
+version: "1.0"
+dataset_version: "240-scenarios"
+last_updated: "2025-10-30"
+
+# ============================================================================
+# VARIABLE NAMING STANDARDS
+# ============================================================================
+# All variables MUST use ${UPPER_SNAKE_CASE} format
+# Examples: ${TARGET_DOMAIN}, ${ADMIN_USER}, ${SESSION_COOKIE}
+
+variables:
+  # Domain and host variables
+  domains:
+    target: "${TARGET_DOMAIN}"
+    attacker: "${ATTACKER_DOMAIN}"
+    trusted: "${TRUSTED_DOMAIN}"
+    collaborator: "${COLLABORATOR_DOMAIN}"  # For OOB testing
+    exploit_server: "${EXPLOIT_SERVER_DOMAIN}"
+
+  # User account variables
+  users:
+    target: "${TARGET_USER}"
+    admin: "${ADMIN_USER}"
+    attacker: "${ATTACKER_USER}"
+    victim: "${VICTIM_USER}"
+    carlos: "${CARLOS_USER}"  # Common PortSwigger username
+    wiener: "${WIENER_USER}"  # Common PortSwigger username
+
+  # Network and IP variables
+  network:
+    target_ip: "${TARGET_IP}"
+    internal_ip: "${INTERNAL_IP}"
+    attacker_ip: "${ATTACKER_IP}"
+    localhost: "${LOCALHOST}"
+
+  # Database variables
+  database:
+    auth_table: "${AUTH_TABLE}"
+    users_table: "${USERS_TABLE}"
+    products_table: "${PRODUCTS_TABLE}"
+    orders_table: "${ORDERS_TABLE}"
+    comments_table: "${COMMENTS_TABLE}"
+    posts_table: "${POSTS_TABLE}"
+    database_name: "${DATABASE_NAME}"
+
+  # Web application variables
+  web:
+    target_url: "${TARGET_URL}"
+    api_endpoint: "${API_ENDPOINT}"
+    app_port: "${APP_PORT}"
+    admin_panel: "${ADMIN_PANEL}"
+    login_url: "${LOGIN_URL}"
+    upload_dir: "${UPLOAD_DIR}"
+
+  # Authentication and session variables
+  auth:
+    session_cookie: "${SESSION_COOKIE}"
+    csrf_token: "${CSRF_TOKEN}"
+    api_key: "${API_KEY}"
+    jwt_token: "${JWT_TOKEN}"
+    oauth_token: "${OAUTH_TOKEN}"
+
+  # Tracking and parameter variables
+  parameters:
+    tracking_param: "${TRACKING_PARAM}"
+    product_id: "${PRODUCT_ID}"
+    user_id: "${USER_ID}"
+    category_param: "${CATEGORY_PARAM}"
+    search_param: "${SEARCH_PARAM}"
+
+  # Credentials
+  credentials:
+    password: "${PASSWORD}"
+    admin_password: "${ADMIN_PASSWORD}"
+    target_password: "${TARGET_PASSWORD}"
+    api_secret: "${API_SECRET}"
+
+# ============================================================================
+# CLI TOOLS - PRODUCTION-READY & AUTOMATABLE
+# ============================================================================
+# These tools are approved for training data
+# All tools must be callable from command line without GUI interaction
+
+tools:
+  web_scanning:
+    - name: "nikto"
+      command: "nikto -h ${TARGET_URL}"
+      purpose: "Web vulnerability scanner"
+      install: "apt-get install nikto"
+
+    - name: "nuclei"
+      command: "nuclei -u ${TARGET_URL} -t cves/"
+      purpose: "Template-based vulnerability scanner"
+      install: "go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest"
+
+    - name: "wpscan"
+      command: "wpscan --url ${TARGET_URL} --enumerate u"
+      purpose: "WordPress vulnerability scanner"
+      install: "gem install wpscan"
+
+  sql_injection:
+    - name: "sqlmap"
+      command: "sqlmap -u ${TARGET_URL} --batch --dbs"
+      purpose: "Automated SQL injection and database takeover"
+      install: "apt-get install sqlmap"
+      flags:
+        - "--batch: Non-interactive mode"
+        - "--dbs: Enumerate databases"
+        - "--dump: Dump table contents"
+        - "--cookie='${SESSION_COOKIE}': Use cookie"
+        - "--level=5: Maximum test level"
+
+  xss_testing:
+    - name: "dalfox"
+      command: "dalfox url ${TARGET_URL} -b https://interactsh.com"
+      purpose: "XSS scanner with parameter analysis"
+      install: "go install github.com/hahwul/dalfox/v2@latest"
+
+    - name: "xsstrike"
+      command: "python3 xsstrike.py -u ${TARGET_URL}"
+      purpose: "XSS detection and exploitation"
+      install: "git clone https://github.com/s0md3v/XSStrike.git"
+
+  fuzzing:
+    - name: "ffuf"
+      command: "ffuf -u ${TARGET_URL}/FUZZ -w wordlist.txt"
+      purpose: "Fast web fuzzer (replaces Burp Intruder)"
+      install: "go install github.com/ffuf/ffuf@latest"
+      use_cases:
+        - "Directory bruteforce: ffuf -u ${TARGET_URL}/FUZZ -w /usr/share/wordlists/dirb/common.txt"
+        - "Parameter fuzzing: ffuf -u ${TARGET_URL}?param=FUZZ -w params.txt"
+        - "Subdomain enum: ffuf -u https://FUZZ.${TARGET_DOMAIN} -w subdomains.txt"
+        - "Virtual host discovery: ffuf -u ${TARGET_URL} -H 'Host: FUZZ.${TARGET_DOMAIN}' -w vhosts.txt"
+
+    - name: "wfuzz"
+      command: "wfuzz -u ${TARGET_URL}/FUZZ -w wordlist.txt --hc 404"
+      purpose: "Web application fuzzer"
+      install: "pip3 install wfuzz"
+      use_cases:
+        - "POST fuzzing: wfuzz -u ${TARGET_URL} -d 'user=FUZZ&pass=test' -w users.txt"
+        - "Cookie fuzzing: wfuzz -u ${TARGET_URL} -b 'session=FUZZ' -w sessions.txt"
+        - "Multiple positions: wfuzz -u ${TARGET_URL} -d 'user=FUZ1Z&pass=FUZ2Z' -w users.txt -w passes.txt"
+
+  http_clients:
+    - name: "curl"
+      command: "curl -X POST ${TARGET_URL} -d 'data=value'"
+      purpose: "Command-line HTTP client (replaces Burp Repeater)"
+      install: "apt-get install curl"
+      common_flags:
+        - "-X METHOD: Specify HTTP method"
+        - "-H 'Header: value': Add header"
+        - "-d 'data': POST data"
+        - "-b 'cookie=value': Send cookie"
+        - "-c cookies.txt: Save cookies"
+        - "-v: Verbose output (replaces Browser DevTools)"
+        - "-i: Include response headers"
+        - "-k: Ignore SSL errors"
+        - "-L: Follow redirects"
+        - "--data-urlencode: URL encode data"
+
+    - name: "httpie"
+      command: "http POST ${TARGET_URL} data=value"
+      purpose: "User-friendly HTTP client"
+      install: "pip3 install httpie"
+      examples:
+        - "GET: http GET ${TARGET_URL}"
+        - "POST JSON: http POST ${TARGET_URL} name=value"
+        - "Headers: http GET ${TARGET_URL} Authorization:'Bearer token'"
+        - "Cookies: http GET ${TARGET_URL} --session=./session.json"
+
+  network_scanning:
+    - name: "nmap"
+      command: "nmap -sV -p- ${TARGET_IP}"
+      purpose: "Network port scanner and service detection"
+      install: "apt-get install nmap"
+
+    - name: "masscan"
+      command: "masscan -p1-65535 ${TARGET_IP} --rate=1000"
+      purpose: "Ultra-fast port scanner"
+      install: "apt-get install masscan"
+
+  brute_force:
+    - name: "hydra"
+      command: "hydra -l ${USERNAME} -P wordlist.txt ${TARGET_IP} http-post-form '/login:user=^USER^&pass=^PASS^:F=incorrect'"
+      purpose: "Password brute force (replaces Burp Intruder for auth)"
+      install: "apt-get install hydra"
+
+    - name: "medusa"
+      command: "medusa -h ${TARGET_IP} -u ${USERNAME} -P wordlist.txt -M http"
+      purpose: "Parallel password cracker"
+      install: "apt-get install medusa"
+
+  proxy_tools:
+    - name: "proxychains"
+      command: "proxychains curl ${TARGET_URL}"
+      purpose: "Force connections through proxy"
+      install: "apt-get install proxychains4"
+
+    - name: "mitmdump"
+      command: "mitmdump -w traffic.dump"
+      purpose: "Non-interactive HTTPS proxy for traffic capture (mitmproxy CLI mode)"
+      install: "pip3 install mitmproxy"
+      note: "Use mitmdump (non-interactive) instead of mitmproxy (interactive UI)"
+
+  dns_tools:
+    - name: "dig"
+      command: "dig ${TARGET_DOMAIN}"
+      purpose: "DNS lookup utility"
+      install: "apt-get install dnsutils"
+
+    - name: "interactsh-client"
+      command: "interactsh-client -server https://interactsh.com"
+      purpose: "OOB interaction server (replaces Burp Collaborator)"
+      install: "go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest"
+      usage: "Monitors DNS/HTTP/SMTP callbacks for blind vulnerabilities"
+
+  encoding_tools:
+    - name: "base64"
+      command: "echo 'data' | base64"
+      purpose: "Base64 encoding/decoding"
+      install: "Built-in on most systems"
+
+    - name: "urlencode"
+      command: "python3 -c \"import urllib.parse; print(urllib.parse.quote('data'))\""
+      purpose: "URL encoding"
+      install: "Built-in Python"
+
+    - name: "jq"
+      command: "curl ${TARGET_URL}/api | jq '.'"
+      purpose: "JSON processing and pretty-printing"
+      install: "apt-get install jq"
+
+  html_parsing:
+    - name: "htmlq"
+      command: "curl ${TARGET_URL} | htmlq 'a[href]' --attribute href"
+      purpose: "Parse HTML with CSS selectors"
+      install: "cargo install htmlq"
+
+    - name: "pup"
+      command: "curl ${TARGET_URL} | pup 'a attr{href}'"
+      purpose: "HTML parsing tool"
+      install: "go install github.com/ericchiang/pup@latest"
+
+  headless_browsers:
+    - name: "puppeteer"
+      command: "node script.js"
+      purpose: "Headless Chrome automation (replaces Browser)"
+      install: "npm install puppeteer"
+      example_script: |
+        const puppeteer = require('puppeteer');
+        (async () => {
+          const browser = await puppeteer.launch();
+          const page = await browser.newPage();
+          await page.goto('${TARGET_URL}');
+          const content = await page.content();
+          console.log(content);
+          await browser.close();
+        })();
+
+    - name: "playwright"
+      command: "playwright codegen ${TARGET_URL}"
+      purpose: "Multi-browser automation"
+      install: "pip3 install playwright"
+
+    - name: "selenium"
+      command: "python3 script.py"
+      purpose: "Browser automation framework"
+      install: "pip3 install selenium"
+
+  command_injection:
+    - name: "commix"
+      command: "commix -u ${TARGET_URL}?cmd=test"
+      purpose: "Command injection exploitation"
+      install: "git clone https://github.com/commixproject/commix.git"
+
+  directory_enumeration:
+    - name: "gobuster"
+      command: "gobuster dir -u ${TARGET_URL} -w /usr/share/wordlists/dirb/common.txt"
+      purpose: "Directory and file brute-forcing"
+      install: "apt-get install gobuster"
+
+    - name: "feroxbuster"
+      command: "feroxbuster -u ${TARGET_URL} -w wordlist.txt"
+      purpose: "Fast recursive content discovery"
+      install: "cargo install feroxbuster"
+
+  subdomain_enumeration:
+    - name: "sublist3r"
+      command: "sublist3r -d ${TARGET_DOMAIN}"
+      purpose: "Subdomain enumeration"
+      install: "pip3 install sublist3r"
+
+    - name: "amass"
+      command: "amass enum -d ${TARGET_DOMAIN}"
+      purpose: "Advanced subdomain discovery"
+      install: "snap install amass"
+
+  jwt_tools:
+    - name: "jwt_tool"
+      command: "jwt_tool ${JWT_TOKEN} -C -d jwt.rocks.hmac.common.txt"
+      purpose: "JWT manipulation and cracking"
+      install: "git clone https://github.com/ticarpi/jwt_tool"
+
+# ============================================================================
+# DEPRECATED TOOLS - DO NOT USE
+# ============================================================================
+# These GUI tools must be replaced in all training data
+
+deprecated_tools:
+  - name: "Burp Suite"
+    reason: "GUI tool requiring manual interaction"
+    replacement_strategy:
+      proxy: "mitmproxy, mitmdump"
+      repeater: "curl, httpie"
+      intruder: "ffuf, wfuzz, hydra"
+      scanner: "nikto, nuclei, zap-cli"
+      collaborator: "interactsh-client"
+      comparer: "diff, colordiff"
+      decoder: "base64, python urllib.parse"
+    migration_notes: |
+      Burp Suite is the most commonly used tool in current training data.
+      Each component must be replaced individually:
+      - Proxy → mitmproxy: Intercept and modify requests
+      - Repeater → curl: Replay and modify requests
+      - Intruder → ffuf/wfuzz: Automate fuzzing and brute force
+      - Scanner → nikto/nuclei: Automated vulnerability scanning
+      - Collaborator → interactsh-client: OOB interaction monitoring
+
+  - name: "Burp Intruder"
+    reason: "GUI-based fuzzing tool"
+    replacements:
+      - tool: "ffuf"
+        use_for: "Fast fuzzing, directory brute-force, parameter testing"
+        example: "ffuf -u ${TARGET_URL}/FUZZ -w wordlist.txt -mc 200"
+      - tool: "wfuzz"
+        use_for: "Complex POST fuzzing, multiple injection points"
+        example: "wfuzz -u ${TARGET_URL} -d 'user=FUZZ&pass=FUZ2Z' -w users.txt -w passes.txt"
+      - tool: "hydra"
+        use_for: "Authentication brute-force"
+        example: "hydra -l admin -P rockyou.txt ${TARGET_IP} http-post-form"
+
+  - name: "Burp Repeater"
+    reason: "GUI-based request replay tool"
+    replacements:
+      - tool: "curl"
+        use_for: "Manual request crafting and replay"
+        example: "curl -X POST ${TARGET_URL} -H 'Cookie: session=abc' -d 'param=value'"
+      - tool: "httpie"
+        use_for: "User-friendly HTTP requests"
+        example: "http POST ${TARGET_URL} Cookie:session=abc param=value"
+
+  - name: "Burp Collaborator"
+    reason: "Proprietary OOB interaction service"
+    replacements:
+      - tool: "interactsh-client"
+        use_for: "Monitor DNS/HTTP/SMTP callbacks"
+        example: "interactsh-client -server https://interactsh.com"
+        usage_pattern: |
+          1. Start interactsh-client to get unique domain
+          2. Inject payload with that domain in XXE/SSRF/Blind XSS
+          3. Monitor client for incoming interactions
+
+  - name: "Browser DevTools"
+    reason: "Requires GUI browser interaction"
+    replacements:
+      - tool: "curl -v"
+        use_for: "View HTTP headers and response"
+        example: "curl -v ${TARGET_URL} 2>&1 | grep -E '^[<>]'"
+      - tool: "mitmdump"
+        use_for: "Inspect all traffic including JavaScript requests"
+        example: "mitmdump -w traffic.dump"
+      - tool: "puppeteer"
+        use_for: "Execute JavaScript and inspect DOM"
+        example: "See puppeteer example in tools section"
+
+  - name: "mitmproxy"
+    reason: "Interactive terminal UI requiring manual interaction"
+    replacement: "mitmdump"
+    migration_notes: |
+      mitmproxy has an interactive terminal UI (like Burp Proxy).
+      Use mitmdump instead for non-interactive traffic capture:
+      - mitmdump -w traffic.dump: Save traffic to file
+      - mitmdump -s script.py: Run Python script on traffic
+      - mitmdump --set block_global=false: Forward all traffic
+    examples:
+      - "Capture traffic: mitmdump -w capture.dump"
+      - "Filter traffic: mitmdump -w capture.dump '~u ${TARGET_URL}'"
+      - "Script traffic: mitmdump -s modify.py"
+
+  - name: "Wireshark"
+    reason: "GUI packet analyzer requiring manual interaction"
+    replacement: "tshark"
+    migration_notes: |
+      Wireshark is GUI-only. Use tshark (CLI version):
+      - tshark -i eth0 -w capture.pcap: Capture packets
+      - tshark -r capture.pcap -Y 'http': Filter HTTP traffic
+      - tcpdump: Alternative for simple packet capture
+    examples:
+      - "Capture HTTP: tshark -i any -f 'tcp port 80' -w http.pcap"
+      - "Read pcap: tshark -r capture.pcap"
+      - "tcpdump: tcpdump -i any -w capture.pcap 'port 80'"
+
+  - name: "Browser Console"
+    reason: "GUI-based JavaScript console"
+    replacements:
+      - tool: "node"
+        use_for: "Execute JavaScript code"
+        example: "node -e \"console.log(atob('base64data'))\""
+      - tool: "puppeteer"
+        use_for: "Execute JavaScript in page context"
+        example: "await page.evaluate(() => { /* JS code */ })"
+
+  - name: "Browser"
+    reason: "GUI application requiring manual clicks"
+    replacements:
+      - tool: "puppeteer"
+        use_for: "Headless Chrome automation"
+        preferred: true
+      - tool: "playwright"
+        use_for: "Multi-browser automation"
+      - tool: "selenium"
+        use_for: "Cross-browser testing"
+      - tool: "curl + htmlq"
+        use_for: "Simple page fetching and parsing"
+
+  - name: "Postman"
+    reason: "GUI-based API client"
+    replacements:
+      - tool: "curl"
+        use_for: "API testing and automation"
+      - tool: "httpie"
+        use_for: "User-friendly API requests"
+
+# ============================================================================
+# NAMING STANDARDS
+# ============================================================================
+
+naming_standards:
+  variables:
+    format: "${VARIABLE_NAME}"
+    case: "UPPER_SNAKE_CASE"
+    rules:
+      - "Always use ${} for variable placeholders"
+      - "Use uppercase letters only"
+      - "Separate words with underscores"
+      - "Be descriptive but concise"
+    examples_correct:
+      - "${TARGET_DOMAIN}"
+      - "${ADMIN_USER}"
+      - "${SESSION_COOKIE}"
+      - "${AUTH_TABLE}"
+    examples_incorrect:
+      - "${target_domain}"  # lowercase
+      - "${TargetDomain}"   # camelCase
+      - "${target-domain}"  # kebab-case
+      - "$TARGET_DOMAIN"    # missing braces
+
+  tool_names:
+    format: "lowercase"
+    rules:
+      - "Use exact tool name as it appears in command line"
+      - "No spaces in tool names"
+      - "Prefer official tool name spelling"
+    examples_correct:
+      - "sqlmap"
+      - "nmap"
+      - "ffuf"
+      - "curl"
+    examples_incorrect:
+      - "SQLMap"
+      - "Nmap"
+      - "FFUF"
+      - "CURL"
+
+  commands:
+    format: "executable with parameters"
+    rules:
+      - "Always include variable placeholders"
+      - "Use full flag names for clarity when documenting"
+      - "Include essential flags only in examples"
+    examples:
+      - "curl -X POST ${TARGET_URL} -d 'user=${USERNAME}'"
+      - "sqlmap -u ${TARGET_URL} --batch --cookie='${SESSION_COOKIE}'"
+      - "ffuf -u ${TARGET_URL}/FUZZ -w wordlist.txt -mc 200"
+
+# ============================================================================
+# CONSISTENCY RULES
+# ============================================================================
+
+consistency_rules:
+  tool_usage:
+    - "Every scenario must use ONLY CLI tools"
+    - "No references to GUI tool features (Intruder, Repeater, etc.)"
+    - "Steps must describe CLI commands, not GUI actions"
+    - "Tools must be automatable without human intervention"
+
+  variable_usage:
+    - "Use consistent variable names across all scenarios"
+    - "Always use ${UPPER_SNAKE_CASE} format"
+    - "Define variables before using them"
+    - "Use descriptive variable names"
+
+  documentation:
+    - "tools_required: List only CLI tools"
+    - "tools_descriptions: Explain CLI usage, not GUI features"
+    - "steps: Provide CLI commands with variable placeholders"
+    - "Include installation commands in tool descriptions"
+
+# ============================================================================
+# TRAINING OBJECTIVES
+# ============================================================================
+
+training_objectives:
+  primary: "Train AI model to perform automated security testing using CLI tools"
+  secondary:
+    - "Enable fully automated vulnerability assessment"
+    - "Teach systematic exploitation workflows"
+    - "Demonstrate real-world penetration testing"
+    - "Provide reproducible attack scenarios"
+
+  requirements:
+    - "All scenarios must be automatable via CLI"
+    - "No manual GUI interaction required"
+    - "Clear command sequences with explanations"
+    - "Proper tool selection for each vulnerability type"
+
+# ============================================================================
+# VALIDATION CHECKLIST
+# ============================================================================
+
+validation_checklist:
+  before_training:
+    - "Run check_consistency.py to verify all files"
+    - "Ensure zero GUI tool references"
+    - "Verify all variables use UPPER_SNAKE_CASE"
+    - "Test that all CLI commands are valid"
+    - "Confirm all tools are installable and documented"
+
+  during_review:
+    - "Check tools_required contains only CLI tools"
+    - "Verify steps describe CLI commands, not GUI actions"
+    - "Ensure variable naming is consistent"
+    - "Validate tool names match official spellings"
+
+  after_updates:
+    - "Re-run audit_tools.py"
+    - "Regenerate consistency report"
+    - "Review changes for new GUI tool references"
+    - "Update this config if new tools are added"
