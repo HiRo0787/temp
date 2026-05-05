@@ -1,163 +1,239 @@
-# Source Directory (src)
+# `src` Deep-Dive README
 
-This directory contains the Rabit0 project source code, organized into subdirectories.
+This README is flow-first and starts from the requested entrypoint:
+`training/single_stage_finetune.py`.
 
-## Directory Structure
+It explains:
+- what executes first,
+- which modules are called next,
+- how data and artifacts move through the pipeline,
+- and how the rest of the `src` tree relates to that flow.
 
-```
-src/
-├── config/data_prep/        # Data prep config (datapoints.yaml, system_prompts, etc.)
-├── data_prep/               # Data preparation and schema
-├── data_creation/           # Dataset generation
-├── eval/                    # Evaluation
-├── training/                # Model training (see training/README.md)
-│   ├── README.md            # Training scripts, options, artifact layout
-│   ├── single_stage_finetune.py  # Primary single-stage training
-│   └── multi_stage_finetune.py   # Multi-stage LoRA chaining
-├── serve/                   # Model serving
-├── infra/                   # Infrastructure and registry
-├── utilities/               # Reusable utilities
-├── docker/                  # Docker management scripts (shell)
-└── review/                  # Review and analysis
-```
+---
 
-## Main Scripts (Production)
+## 1) Real Execution Flow (Single-Stage Finetuning)
 
-### Training
-- **`training/single_stage_finetune.py`** - **PRIMARY SINGLE-STAGE TRAINING SCRIPT**
-  - Refactored to follow SOLID and DRY principles
-  - Uses ModelRegistry (SOLID-compliant)
-  - Supports all Qwen models via `src/config/model/models.yaml`
-  - vLLM-compatible output
-  - When `--output` is omitted, saves to `artifacts/<model_name>/rabit0-v1-run1`, `rabit0-v1-run2`, ... with a `rabit0-v1-latest` marker
-  - **Resume**: `--resume-from-checkpoint` (latest in output dir) or `--resume-from-checkpoint <path>`; use same `--output` and `--data` as the original run
-  - **Learning/data-loading strategies**: `--learning-type random-shuffled|blocked-learning|interleaved-learning|curriculum|blocked-curriculum|interleaved-curriculum`
-  - **Quantization**: `--use-4bit` (QLoRA) or `--use-8bit` (mutually exclusive)
-  - **LR scheduler**: `--lr-scheduler-type constant|linear|cosine|step`
-  - **Optimizer**: `--learning-rate` (default 2e-5), `--weight-decay` (default 0.0, AdamW)
-  - Usage: `python src/training/single_stage_finetune.py --data combine_output/all_training_data.jsonl --model-key qwen2.5-7b --epochs 3`
-- **`training/multi_stage_finetune.py`** - Multi-stage LoRA chaining across multiple data files; when `--output` is omitted uses `artifacts/rabit0-multistage-vllm/rabit0-v1-runN`; supports `--test-only` and `--continue-from-lora`
-- **`training/README.md`** - Full documentation: options, artifact output structure, data format, resource requirements, troubleshooting
+### 1.1 CLI entrypoint
+Primary script: `training/single_stage_finetune.py`
 
-### Data Preparation
-Located in `data_prep/` (see **data_prep/README.md** for full details):
-- **`combine_training_data.py`** - Combines training data from `data_points/` (JSON/YAML) into a single JSONL; supports `--list`, `--validate`, per-source selection, and snapshot switching by `--use-version-id` or `--use-data-points-sha`.
-- **`data_schema.py`** - Pydantic models (SecurityScenario, QAScenario, PayloadScenario, TrainingExample) and generators that build training examples from each scenario type.
-- **`json_source_loader.py`** - Loads and validates JSON/YAML files from `data_points/`; returns SecurityScenario, QAScenario, or PayloadScenario instances.
-- **`data_versioning.py`** - Version artifact manager (manifest/checksums/archive), hash-based version reuse, `index.json` lookup (`sha <-> version_id`), and auto-extraction of archived `data_points/` when switching versions.
+Main control paths:
+- `--list-models`: reads model registry and exits.
+- `--test-only`: loads base model (+ optional LoRA checkpoint) and runs prompts.
+- default training path: full train -> save -> optional merge -> optional eval.
 
-Legacy: RESK-FR Hugging Face transformer moved to **archived/dataset_transformer.py** (used only by archived/external_dataset.py).
+### 1.2 Model selection + loading
+`QwenVLLMFineTuner.__init__` calls:
+- `infra.model_registry.get_registry()`:
+  - reads `config/model/models.yaml`,
+  - resolves model by `--model-key` or (`--model-version`, `--model-size`),
+  - exposes defaults (dtype, unsloth, LoRA config).
+- `utilities.training_config.TrainingConfig.get_torch_dtype()`.
+- `utilities.model_loader.ModelLoader`:
+  - `load_with_unsloth()` if enabled,
+  - otherwise `load_standard()`,
+  - supports fallback models from registry chain.
 
-### Serving
-Located in `serve/`:
-- **`serve_rabit0_vllm.py`** - vLLM OpenAI-compatible API server
-- **`merge_lora_for_vllm.py`** - Merges LoRA adapters for vLLM deployment
-- **`python_json_tool_parser.py`** - Custom vLLM tool parser plugin (extracts JSON tool calls from text)
+### 1.3 LoRA preparation
+`prepare_model_for_training()` calls `utilities.lora_preparer.LoRAPreparer`:
+- Unsloth path: `FastLanguageModel.get_peft_model(...)`.
+- Standard path: PEFT `LoraConfig` + `get_peft_model(...)`.
+- LoRA target modules are sourced from `models.yaml` model config.
 
-### Evaluation
-Located in `eval/`:
-- **`secqa_eval.py`** - Shared SecQA evaluation utilities: prompt formatting, dataset loading, checkpoint discovery, result persistence, and the `run_secqa_on_model()` evaluation loop. Used by `training/single_stage_finetune.py` via `--secqa-eval` / `--secqa-run-dir` flags. See `docs/SECQA_EVAL.md` for full usage.
-- **`evaluate_qwen3guard.py`** - Evaluates models via vLLM API (simple, focused)
-- **`evaluate.py`** - Comprehensive evaluation framework (supports OpenAI API and local models)
+### 1.4 Data loading + ordering
+`load_training_data()` calls `utilities.data_loader.DataLoader`:
+- Reads JSONL records (`messages`, optional `metadata`).
+- Splits train/test (90/10).
+- Uses `utilities.data_formatter.DataFormatter.format_training_data()` to apply tokenizer chat template.
+- Tokenizes with max length from CLI/default.
+- Assigns difficulty buckets by context length.
+- Applies `--learning-type` strategy:
+  - `curriculum`, `random-shuffled`, `blocked-*`, `interleaved-*`.
 
-## Infrastructure Scripts
+### 1.5 Run directory + provenance
+Before training:
+- `utilities.single_stage_helpers.resolve_output_dir()` picks run dir.
+- `utilities.artifact_paths.ensure_artifact_run_subdirs()` creates:
+  - `checkpoints/`, `lora/`, `merged/`, `logs/`, `data_versions/`.
+- `copy_data_manifest(...)` stores dataset provenance manifest with the run.
+- `build_run_config_payload(...)` + `write_run_config_file(...)` writes run config JSON.
 
-Located in `infra/`:
-- **`model_registry.py`** - Model configuration registry (SOLID)
-- **`project_paths.py`** - Standardized path management (SOLID)
-- **`validator.py`** - Data validation utilities
-- **`taxonomy.py`** - Security taxonomy definitions
-- **`tool_registry.py`** - Security tool registry
-- **`mitre_owasp_mappings.py`** - MITRE ATT&CK and OWASP mappings
-- **`refusal_coverage.py`** - Refusal coverage tracking
-- **`specialized_templates.py`** - Template definitions
+### 1.6 Trainer construction
+Training path branches:
+- Unsloth: TRL `SFTTrainer`.
+- Standard: custom HF `Trainer` with custom loss/data-collator safeguards.
 
-## Utility Scripts
+Shared setup:
+- `TrainingConfig.get_eval_config(...)`
+- `single_stage_helpers.compute_save_steps(...)`
+- `TrainingConfig.get_optimizer_config(...)`
+- `single_stage_helpers.get_eval_strategy_kwargs(...)`
+- `TrainingArguments(...)` with eval/save/logging/checkpoint config.
 
-Located in `utilities/`:
+### 1.7 Train + checkpoint resume behavior
+If resuming:
+- `single_stage_helpers.patch_checkpoint_trainer_state(...)` updates old checkpoint eval/save cadence.
 
-### Training Utilities (Active - Used by training scripts)
-- **`training_config.py`** - Training configuration utilities (dtype conversion, optimizer config, environment setup)
-- **`training_logger.py`** - Centralized logging utility (headers, info, success, warning, error messages)
-- **`model_loader.py`** - Model loading utility (Unsloth and standard loading with fallback support)
-- **`data_formatter.py`** - Data formatting utility (training data and prompt formatting for Qwen models)
-- **`data_loader.py`** - Data loading utility (dataset loading and tokenization)
-- **`lora_preparer.py`** - LoRA preparation utility (LoRA adapter setup for fine-tuning)
-- **`lora_readme.py`** - Auto-generate LoRA README.md with training metadata (base model, hyperparameters, steps)
-- **`artifact_paths.py`** - Artifact paths: `artifacts/<model_name>/rabit0-v1-run1`, `run2`, ... (finetune outputs; logs elsewhere), `ensure_artifact_run_subdirs(run_dir)` (checkpoints, lora, merged, logs), and `resolve_latest_artifact(model_name, run_prefix="rabit0-v1")`
-- **`single_stage_helpers.py`** - Helpers for single-stage fine-tuning (e.g. `resolve_output_dir` using artifact paths when `--output` is omitted)
-- **`multi_stage_helpers.py`** - Helpers for multi-stage LoRA chaining (stage LR, mixed dataset, load existing LoRA)
-- **`colours.py`** - Terminal colour helpers for logging
+Then:
+- `trainer.train(...)`
+- save LoRA to `lora/`
+- save tokenizer
+- generate LoRA README via `utilities.lora_readme.write_lora_readme(...)`
+- optional merge via `_merge_lora_adapters(...)`.
 
-## Data Generation Scripts
+### 1.8 Optional post-train benchmark eval
+If `--eval-after-train`:
+- resolve checkpoint (`best` or `final`) via `resolve_post_train_eval_checkpoint_path(...)`.
+- release GPU from trainer process.
+- run `python -m src.eval.run_eval` once per selected benchmark (subprocess).
+- restore model back to CUDA for local prompt test.
 
-Located in `data_creation/`:
-- **`generate_comprehensive_dataset.py`** - Comprehensive dataset generation (5,000+ examples)
-- **`generate_premium_detailed.py`** - Premium detailed examples
-- **`generate_premium_unrestriction.py`** - Premium unrestriction examples
-- **`generate_unrestriction_batches.py`** - Batch unrestriction generation
-- **`generate_refusal_only_dataset.py`** - Refusal-only dataset
-- **`generate_5k_dataset.sh`** - Shell wrapper for dataset generation
+### 1.9 Final smoke test
+`test_model(...)` runs fixed prompts and logs outputs.
 
-## Docker Scripts
+---
 
-Located in `docker/`:
-- **`docker-build.sh`** - Build Docker images
-- **`docker-start.sh`** - Start containers
-- **`docker-stop.sh`** - Stop containers
-- **`docker-exec.sh`** - Execute commands in containers
-- **`docker-logs.sh`** - View container logs
-- **`setup-server.sh`** - Server setup
+## 2) Import Dependency Graph (from the starting script)
 
-## Review Scripts
+Direct imports used by `training/single_stage_finetune.py`:
+- `infra/model_registry.py`
+- `infra/project_paths.py`
+- `utilities/training_config.py`
+- `utilities/training_logger.py`
+- `utilities/model_loader.py`
+- `utilities/data_formatter.py`
+- `utilities/data_loader.py`
+- `utilities/lora_preparer.py`
+- `utilities/artifact_paths.py`
+- `utilities/lora_readme.py`
+- `utilities/model_config_serialization.py`
+- `utilities/single_stage_helpers.py`
 
-Located in `review/`:
-- **`query_rabit0_model.py`** - Direct model querying (alternative to vLLM API)
+Second-level runtime dependencies reached through these:
+- `eval/run_eval.py`
+- `eval/checkpoint_runner.py`
+- `eval/reporting.py`
+- `eval/benchmarks/*` (selected by `--eval-bench`)
+- `config/model/models.yaml`
+- `config/data_prep/*` (indirectly via data prep and schema modules)
 
-## Import Paths
+---
 
-All imports have been updated to reflect the new directory structure:
+## 3) Data Flow and Artifact Flow
 
-### Main Scripts
-- **Data Schema**: `from src.data_prep.data_schema import ...`
+### Data flow
+1. `data_prep/combine_training_data.py` creates JSONL in `combine_output/<version_id>/all_training_data.jsonl`.
+2. Optional manifest (`manifest.json`) is produced alongside JSONL.
+3. `single_stage_finetune.py --data ...` consumes that JSONL.
+4. Manifest is copied into run artifacts (`data_versions/manifest.json`) for provenance.
 
-### Infrastructure
-- **Taxonomy**: `from src.infra.taxonomy import ...`
-- **Tool Registry**: `from src.infra.tool_registry import ...`
-- **Validator**: `from src.infra.validator import ...`
-- **MITRE/OWASP Mappings**: `from src.infra.mitre_owasp_mappings import ...`
-- **Refusal Coverage**: `from src.infra.refusal_coverage import ...`
-- **Model Registry**: `from src.infra.model_registry import ...`
-- **Project Paths**: `from src.infra.project_paths import ...`
+### Artifact flow
+Per training run (`artifacts/<model>/<run>/`):
+- `checkpoints/`: HF checkpoint-* directories.
+- `lora/`: final adapter + tokenizer.
+- `merged/`: full merged model when requested.
+- `logs/`: tensorboard events.
+- `data_versions/manifest.json`: dataset version trace.
+- `config.json`: run metadata/hyperparameters.
 
-### Training Utilities
-- **Training Config**: `from src.utilities.training_config import TrainingConfig`
-- **Training Logger**: `from src.utilities.training_logger import Logger`
-- **Model Loader**: `from src.utilities.model_loader import ModelLoader`
-- **Data Formatter**: `from src.utilities.data_formatter import DataFormatter`
-- **Data Loader**: `from src.utilities.data_loader import DataLoader`
-- **LoRA Preparer**: `from src.utilities.lora_preparer import LoRAPreparer`
-- **Artifact Paths**: `from src.utilities.artifact_paths import get_artifact_run_dir, resolve_latest_artifact`
+---
 
-## Notes
+## 4) Folder-by-Folder Deep Explanation
 
-### Training
-- **Single-stage**: Use **`training/single_stage_finetune.py`** for one data file; **multi-stage**: use **`training/multi_stage_finetune.py`** for chained LoRA stages.
-- **Data ordering**: Single-stage uses `--learning-type` for train ordering strategy (`random-shuffled`, `blocked-learning`, `interleaved-learning`, `curriculum`, `blocked-curriculum`, `interleaved-curriculum`).
-- **Resume**: Single-stage supports **`--resume-from-checkpoint`** (latest in output dir) or **`--resume-from-checkpoint <path>`**; use the same `--output` and `--data` as the run that created the checkpoint.
-- **Output layout**: Omitting `--output` writes to **`artifacts/<model_name>/rabit0-v1-run1`**, `run2`, ... (e.g. `artifacts/qwen2.5-7b/rabit0-v1-run1`). Use **`resolve_latest_artifact("qwen2.5-7b", run_prefix="rabit0-v1")`** (single-stage) or **`resolve_latest_artifact("rabit0-multistage-vllm", run_prefix="rabit0-v1")`** (multi-stage) to get the latest run path in code.
-- Full training docs (options, data format, resources, troubleshooting): **`training/README.md`**.
-- Training scripts follow SOLID and DRY principles; utility classes are in `utilities/`.
-- Model configuration is in **`src/config/model/models.yaml`**.
+## `training/`
+- `single_stage_finetune.py`: primary one-run finetuner (flow described above).
+- `multi_stage_finetune.py`: stage-wise continuation with LoRA replay support.
+- `README.md`: command-level training docs.
 
-### Code Organization
-- Paths are standardized via **`infra/project_paths.py`**
-- Training utilities are modular and shared by single- and multi-stage scripts
+## `utilities/`
+- `training_config.py`: dtype mapping, optimizer config, single-process env helpers.
+- `training_logger.py`: centralized colored logging + tee-to-file run logs.
+- `model_loader.py`: unsloth/HF model loading + fallback chain logic.
+- `data_formatter.py`: chat-template-based training/inference prompt formatting.
+- `data_loader.py`: JSONL load, train/test split, tokenization, curriculum ordering.
+- `lora_preparer.py`: PEFT/Unsloth LoRA attachment and trainable parameter setup.
+- `artifact_paths.py`: run dir allocation, subdir creation, latest marker, manifest copy.
+- `single_stage_helpers.py`: single-stage-specific defaults, run config writing, post-train eval runner.
+- `multi_stage_helpers.py`: stage learning rates, replay mixing, load-existing-lora continuation.
+- `lora_readme.py`: writes metadata README into LoRA output.
+- `model_config_serialization.py`: patches non-JSON-safe model configs before trainer serialization.
+- `colours.py`: terminal color/formatter support.
 
-### Serving
-- The `python_json_tool_parser.py` is loaded as a plugin by vLLM via `--tool-parser-plugin` flag
+## `infra/`
+- `model_registry.py`: config-driven model abstraction (`ModelConfig`, aliases, fallback chains).
+- `project_paths.py`: canonical root/artifacts/config/log path resolver.
+- `taxonomy.py`: large security taxonomy and consistency rules.
+- `tool_registry.py`: standardized tool descriptions and category mappings.
+- `mitre_owasp_mappings.py`: topic->MITRE, topic->OWASP, category->tactic mappings.
+- `validator.py`: dataset quality and consistency validator against taxonomy/mappings.
+- `refusal_coverage.py`: tracks coverage of high-refusal attack topics.
+- `specialized_templates.py`: scenario-template functions for dataset generation pipelines.
 
-### Import Structure
-- Use package imports: `from src.data_prep.*`, `from src.infra.*`, `from src.utilities.<module> import <Class>`
-- See `docs/SCRIPT_ANALYSIS.md` for detailed script analysis
+## `data_prep/`
+- `combine_training_data.py`: orchestrates scenario loading + conversion + output writing.
+- `json_source_loader.py`: parses JSON/YAML and validates to schema types.
+- `data_schema.py`: Pydantic schemas + training-example generators.
+- `data_versioning.py`: version IDs, content hashes, archives, index, manifest management.
+- `README.md`: full operational data pipeline guide.
+
+## `eval/`
+- `run_eval.py`: unified benchmark CLI for base model or LoRA checkpoints.
+- `checkpoint_runner.py`: load-once base model and in-place adapter swap loop.
+- `reporting.py`: manifest/report generation for eval runs.
+- `prompt.py`: interactive prompt REPL for model/checkpoint.
+- `eval_checkpoint_loss.py`: per-datapoint loss diagnostics for a checkpoint.
+- `evaluate.py`: broader legacy evaluator (OpenAI/local scoring harness).
+- `evaluate_qwen3guard.py`: vLLM endpoint test harness.
+- `benchmarks/`: benchmark-specific runners grouped into:
+  - `cybersecurity/`
+  - `safeguards/`
+  - `coding/`
+  - `reasoning/`
+- `benchmarks/benchmarks_catalog.yaml`: task catalog used by helper task limiting.
+
+## `serve/`
+- `serve_rabit0_vllm.py`: starts vLLM OpenAI-compatible server with base model + optional LoRA.
+- `merge_lora_for_vllm.py`: merges adapter into base model for pure merged deployment.
+- `python_json_tool_parser.py`: custom vLLM tool-call parser plugin for JSON-in-text extraction.
+
+## `review/`
+- `query_rabit0_model.py`: direct local query script for base+LoRA testing.
+
+## `config/`
+- `config/model/models.yaml`: source of truth for model keys, aliases, fallbacks, and LoRA defaults.
+- `config/data_prep/datapoints.yaml`: active dataset source list for combiner.
+- `config/data_prep/system_prompts.yaml`, `training_categories.yaml`, `quality_guidelines.yaml`: generation/runtime data-shaping configs.
+
+---
+
+## 5) How the Rest of `src` Connects Back to the Starting Script
+
+From `single_stage_finetune.py`, the practical downstream loop is:
+1. Train adapters (`training` + `utilities` + `infra`).
+2. Optionally evaluate checkpoints (`eval` + `benchmarks`).
+3. Serve resulting model (`serve`).
+4. Regenerate improved datasets (`data_prep`) and retrain.
+
+So the repository is not isolated scripts; it is one iterative system:
+`data_prep -> train -> eval -> serve -> data improvements -> retrain`.
+
+---
+
+## 6) Notes on Current Codebase Shape
+
+- The single-stage script is the most modern orchestrator and the best "source-of-truth" runtime path.
+- Some modules (for example `evaluate.py` / `evaluate_qwen3guard.py`) are auxiliary evaluators outside the main `run_eval` checkpoint loop.
+- Several scripts include backward-compatible path/import fallbacks; functionally this does not change the flow above.
+
+---
+
+## 7) Quick Start Path (Recommended)
+
+1. Build data:
+   - `python src/data_prep/combine_training_data.py`
+2. Train:
+   - `python src/training/single_stage_finetune.py --data combine_output/<version_id>/all_training_data.jsonl --model-key qwen2.5-7b`
+3. Eval:
+   - `python -m src.eval.run_eval --run-dir artifacts/<model>/<run_id> --bench secqa`
+4. Serve:
+   - `python src/serve/serve_rabit0_vllm.py --base-model <base> --adapter-path artifacts/<model>/<run_id>/lora`
 
